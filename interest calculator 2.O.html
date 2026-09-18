@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Interest Calculator Web App</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; }
+    h1 { color: #333; }
+    label, input { margin: 5px 0; display: block; }
+    input[type="number"], input[type="date"] { padding: 6px; width: 200px; }
+    button { padding: 10px 20px; background: #007BFF; border: none; color: #fff; cursor: pointer; margin-top: 10px; }
+    button:hover { background: #0056b3; }
+    table { width: 100%; margin-top: 20px; border-collapse: collapse; background: #fff; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #007BFF; color: #fff; }
+  </style>
+</head>
+<body>
+
+<h1>Interest Calculator Web App</h1>
+
+<form id="interestForm">
+  <label>Principal Amount:</label>
+  <input type="number" id="principal" required>
+
+  <label>Annual Interest Rate (%):</label>
+  <input type="number" id="rate" required step="0.01">
+
+  <label>Start Date:</label>
+  <input type="date" id="startDate" required>
+
+  <label>End Date:</label>
+  <input type="date" id="endDate" required>
+
+  <button type="submit">Calculate</button>
+</form>
+
+<table id="resultTable" style="display:none;">
+  <thead>
+    <tr>
+      <th>Month</th>
+      <th>No. of Days</th>
+      <th>Daily Interest</th>
+      <th>Monthly Interest</th>
+      <th>Cumulative Interest</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+  <tfoot>
+    <tr>
+      <th colspan="1">Total</th>
+      <th id="totalDays"></th>
+      <th>-</th>
+      <th id="totalInterest"></th>
+      <th>-</th>
+    </tr>
+  </tfoot>
+  <div id="duration" style="margin-top:15px;font-weight:bold;display:none;"></div>
+</table>
+
+<script>
+function calculateInterest(principal, annualRate, startDate, endDate, useCompoundAfterOneYear) {
+  const result = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  let current = new Date(start);
+  let totalInterest = 0;
+  let compoundPrincipal = principal;
+  let totalDays = 0;
+
+  while (current <= end) {
+    const monthStart = new Date(current.getFullYear(), current.getMonth(), 1);
+    const monthEnd = new Date(current.getFullYear(), current.getMonth() + 1, 0);
+    const daysInMonth = (monthEnd - monthStart) / (1000 * 60 * 60 * 24) + 1;
+
+    let activeDays = Math.min(
+      (end - current) / (1000 * 60 * 60 * 24) + 1,
+      daysInMonth - current.getDate() + 1
+    );
+
+    let monthlyInterest = 0;
+
+    for (let i = 0; i < activeDays; i++) {
+      const elapsedDays = Math.floor((current - start) / (1000 * 60 * 60 * 24));
+      let dailyInterest;
+
+      if (elapsedDays < 365) {
+        dailyInterest = (principal * annualRate) / (100 * 12) / 30;
+        monthlyInterest += dailyInterest;
+      } else {
+        if (useCompoundAfterOneYear) {
+          dailyInterest = (compoundPrincipal * annualRate) / (100 * 12) / 30;
+          monthlyInterest += dailyInterest;
+          compoundPrincipal += dailyInterest;
+        } else {
+          dailyInterest = (principal * annualRate) / (100 * 12) / 30;
+          monthlyInterest += dailyInterest;
+        }
+      }
+      current.setDate(current.getDate() + 1);
+    }
+
+    totalInterest += monthlyInterest;
+    totalDays += activeDays;
+
+    result.push({
+      month: `${monthStart.toLocaleString('default', { month: 'short' })}-${monthStart.getFullYear()}`,
+      days: activeDays,
+      dailyInterest: `₹${((principal * annualRate) / (100 * 12) / 30).toFixed(2)}`,
+      monthlyInterest: `₹${monthlyInterest.toFixed(2)}`,
+      cumulativeInterest: `₹${totalInterest.toFixed(2)}`
+    });
+  }
+
+  return { result, totalDays, totalInterest };
+}
+
+document.getElementById("interestForm").addEventListener("submit", function(e) {
+  e.preventDefault();
+  const principal = parseFloat(document.getElementById("principal").value);
+  const rate = parseFloat(document.getElementById("rate").value);
+  const startDate = document.getElementById("startDate").value;
+  const endDate = document.getElementById("endDate").value;
+
+  if (startDate >= endDate) {
+    alert("End date should be after start date.");
+    return;
+  }
+
+  const useCompoundAfterOneYear = confirm("Do you want to switch to compound interest after 1 year?");
+  const { result: breakdown, totalDays, totalInterest } = calculateInterest(principal, rate, startDate, endDate, useCompoundAfterOneYear);
+
+  const tbody = document.querySelector("#resultTable tbody");
+  tbody.innerHTML = "";
+
+  breakdown.forEach(row => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${row.month}</td>
+      <td>${row.days}</td>
+      <td>${row.dailyInterest}</td>
+      <td>${row.monthlyInterest}</td>
+      <td>${row.cumulativeInterest}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById("totalDays").textContent = totalDays;
+  document.getElementById("totalInterest").textContent = `₹${totalInterest.toFixed(2)}`;
+
+  // Show total duration separately in months and weeks
+  const totalMonths = Math.floor(totalDays / 30);
+  const remainingDays = totalDays % 30;
+  const totalWeeks = Math.floor(totalDays / 7);
+  const remainingWeekDays = totalDays % 7;
+  document.getElementById("duration").innerHTML =
+    `Total Duration: <b>${totalMonths} month${totalMonths !== 1 ? "s" : ""} ${remainingDays} day${remainingDays !== 1 ? "s" : ""}</b> &nbsp; | &nbsp; <b>${totalWeeks} week${totalWeeks !== 1 ? "s" : ""} ${remainingWeekDays} day${remainingWeekDays !== 1 ? "s" : ""}</b>`;
+  document.getElementById("duration").style.display = "block";
+  document.getElementById("resultTable").style.display = "table";
+});
+</script>
+
+</body>
+</html>
